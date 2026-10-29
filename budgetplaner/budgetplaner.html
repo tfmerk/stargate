@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="de" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haushalts- & Budgetplaner für 2 Personen</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        teal: {
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                        },
+                        slate: {
+                            800: '#1e293b',
+                            850: '#172033',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-900 text-slate-100 antialiased selection:bg-teal-500 selection:text-white">
+
+    <!-- Header / Navigation -->
+    <header class="border-b border-slate-800 bg-slate-850/80 backdrop-blur sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-gradient-to-tr from-teal-600 to-emerald-500 rounded-xl shadow-lg shadow-teal-500/20 text-white">
+                    <i class="fa-solid fa-wallet text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                        BudgetPlaner <span class="text-xs font-semibold px-2 py-0.5 rounded bg-teal-500/20 text-teal-400 border border-teal-500/30">2 Personen</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Gemeinsame Finanzen & 3-Konten-Modell</p>
+                </div>
+            </div>
+
+            <!-- Actions: Export, Import, Reset -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="exportXML()" class="px-3.5 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition duration-200 flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-file-export text-teal-400"></i>
+                    <span>XML Export</span>
+                </button>
+                
+                <label class="px-3.5 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition duration-200 cursor-pointer flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-file-import text-teal-400"></i>
+                    <span>XML Import</span>
+                    <input type="file" id="importFileInput" accept=".xml" class="hidden" onchange="importXML(event)">
+                </label>
+
+                <button onclick="resetToDefaults()" class="px-3.5 py-2 text-xs font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg transition duration-200 flex items-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i>
+                    <span>Zurücksetzen</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notification / Alert Banner -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div id="toastContent" class="px-4 py-3 rounded-xl shadow-2xl bg-slate-800 border border-slate-700 text-sm flex items-center gap-3">
+            <i id="toastIcon" class="fa-solid fa-circle-check text-teal-400 text-lg"></i>
+            <span id="toastMessage">Erfolgreich gespeichert!</span>
+        </div>
+    </div>
+
+    <!-- Main Application Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- KPI Executive Summary Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Total Income -->
+            <div class="bg-slate-850 p-5 rounded-2xl border border-slate-800 relative overflow-hidden group hover:border-slate-700 transition">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                    <i class="fa-solid fa-money-bill-wave text-5xl text-emerald-400"></i>
+                </div>
+                <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Gesamteinkommen</p>
+                <h2 id="kpiIncome" class="text-2xl font-extrabold text-emerald-400 mt-2">0,00 €</h2>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <i class="fa-solid fa-users text-slate-500"></i>
+                    <span>Person 1 + Person 2</span>
+                </div>
+            </div>
+
+            <!-- Total Expenses -->
+            <div class="bg-slate-850 p-5 rounded-2xl border border-slate-800 relative overflow-hidden group hover:border-slate-700 transition">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                    <i class="fa-solid fa-credit-card text-5xl text-rose-400"></i>
+                </div>
+                <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Gesamtausgaben</p>
+                <h2 id="kpiExpenses" class="text-2xl font-extrabold text-rose-400 mt-2">0,00 €</h2>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <i class="fa-solid fa-arrow-down-long text-rose-400"></i>
+                    <span id="kpiExpensesPercent">0% vom Einkommen</span>
+                </div>
+            </div>
+
+            <!-- Surplus / Balance -->
+            <div class="bg-slate-850 p-5 rounded-2xl border border-slate-800 relative overflow-hidden group hover:border-slate-700 transition">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                    <i class="fa-solid fa-scale-balanced text-5xl text-teal-400"></i>
+                </div>
+                <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Freier Überschuss</p>
+                <h2 id="kpiSurplus" class="text-2xl font-extrabold text-teal-400 mt-2">0,00 €</h2>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <span id="kpiSurplusSub">Nach allen Ausgaben</span>
+                </div>
+            </div>
+
+            <!-- Savings Rate -->
+            <div class="bg-slate-850 p-5 rounded-2xl border border-slate-800 relative overflow-hidden group hover:border-slate-700 transition">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                    <i class="fa-solid fa-piggy-bank text-5xl text-amber-400"></i>
+                </div>
+                <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Sparquote</p>
+                <h2 id="kpiSavingsRate" class="text-2xl font-extrabold text-amber-400 mt-2">0,0 %</h2>
+                <div class="w-full bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                    <div id="kpiSavingsBar" class="bg-amber-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Income & Analytics Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left: Income Input Panel (5 cols) -->
+            <div class="lg:col-span-5 bg-slate-850 p-6 rounded-2xl border border-slate-800 space-y-5">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <h2 class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-hand-holding-dollar text-teal-400"></i>
+                        Einkommen
+                    </h2>
+                    <span class="text-xs text-slate-400">Netto / Monat</span>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1" for="incomeP1">
+                            Nettoeinkommen Person 1 (€)
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="incomeP1" min="0" step="10" placeholder="2400"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
+                                oninput="updateBudget()">
+                            <span class="absolute right-3.5 top-2.5 text-xs text-slate-500 font-semibold">€</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1" for="incomeP2">
+                            Nettoeinkommen Person 2 (€)
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="incomeP2" min="0" step="10" placeholder="1800"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
+                                oninput="updateBudget()">
+                            <span class="absolute right-3.5 top-2.5 text-xs text-slate-500 font-semibold">€</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1" for="incomeBonus">
+                            Sonstiges / Neben-Einkommen (€)
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="incomeBonus" min="0" step="10" placeholder="0"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition"
+                                oninput="updateBudget()">
+                            <span class="absolute right-3.5 top-2.5 text-xs text-slate-500 font-semibold">€</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-800/80 bg-slate-900/50 p-3.5 rounded-xl flex justify-between items-center text-sm">
+                    <span class="text-slate-400 font-medium">Summe Einkommen:</span>
+                    <span id="incomeTotalLabel" class="font-bold text-emerald-400">0,00 €</span>
+                </div>
+            </div>
+
+            <!-- Right: Chart & Visuals (7 cols) -->
+            <div class="lg:col-span-7 bg-slate-850 p-6 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <h2 class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-teal-400"></i>
+                        Ausgabenverteilung
+                    </h2>
+                    <span class="text-xs text-slate-400">Visualisierung</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                    <div class="relative h-48 sm:h-52 w-full flex items-center justify-center">
+                        <canvas id="budgetChart"></canvas>
+                    </div>
+                    <div id="chartLegend" class="space-y-2 text-xs">
+                        <!-- Dynamic Legend content inserted by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expense Categories Section -->
+        <section class="space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-teal-400"></i>
+                        Ausgaben-Kategorien
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">Verwalte eure monatlichen Ausgaben und erstelle bei Bedarf eigene Positionen.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="categoriesContainer">
+                <!-- Dynamically populated categories -->
+            </div>
+        </section>
+
+        <!-- 3-Konten-Modell Calculator Section -->
+        <section class="bg-slate-850 p-6 sm:p-8 rounded-2xl border border-slate-800 space-y-6 relative overflow-hidden">
+            <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-teal-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-diagram-project text-teal-400"></i>
+                        3-Konten-Modell Rechner
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">Gerechte Verteilung der gemeinsamen Fixkosten auf das Gemeinschaftskonto.</p>
+                </div>
+
+                <!-- Mode Switcher -->
+                <div class="inline-flex bg-slate-900 p-1 rounded-xl border border-slate-700 text-xs">
+                    <button id="splitModeProp" onclick="setSplitMode('proportional')" class="px-3 py-1.5 rounded-lg font-medium transition bg-teal-600 text-white shadow">
+                        Proportional (Einkommen)
+                    </button>
+                    <button id="splitModeEqual" onclick="setSplitMode('equal')" class="px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition">
+                        50 / 50 Gleich
+                    </button>
+                </div>
+            </div>
+
+            <!-- Calculation Output Dashboard -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Gemeinsames Zielkonto -->
+                <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-teal-400 uppercase tracking-wider">Gemeinschaftskonto</span>
+                            <i class="fa-solid fa-building-columns text-slate-500"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-slate-100 mt-2" id="sharedTotal">0,00 €</h3>
+                        <p class="text-xs text-slate-400 mt-1">Bedarf für Wohnen, Alltag & gemeinsames Sparen</p>
+                    </div>
+                    <div class="text-xs text-slate-500 border-t border-slate-800 pt-3">
+                        Automatisch berechnet aus den ausgewählten gemeinsamen Positionen.
+                    </div>
+                </div>
+
+                <!-- Person 1 Share -->
+                <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Beitrag Person 1</span>
+                            <span id="p1RatioBadge" class="text-xs bg-slate-800 text-teal-400 px-2 py-0.5 rounded border border-slate-700 font-mono">0%</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-teal-400 mt-2" id="p1Contribution">0,00 €</h3>
+                        <p class="text-xs text-slate-400 mt-1">Verbleibend auf Eigendem Konto: <span id="p1Rest" class="font-semibold text-slate-200">0,00 €</span></p>
+                    </div>
+                    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div id="p1Bar" class="bg-teal-500 h-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Person 2 Share -->
+                <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Beitrag Person 2</span>
+                            <span id="p2RatioBadge" class="text-xs bg-slate-800 text-teal-400 px-2 py-0.5 rounded border border-slate-700 font-mono">0%</span>
+                        </div>
+                        <h3 class="text-2xl font-bold text-teal-400 mt-2" id="p2Contribution">0,00 €</h3>
+                        <p class="text-xs text-slate-400 mt-1">Verbleibend auf Eigenem Konto: <span id="p2Rest" class="font-semibold text-slate-200">0,00 €</span></p>
+                    </div>
+                    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div id="p2Bar" class="bg-teal-400 h-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-6 mt-12 bg-slate-850 text-center text-xs text-slate-500">
+        <p>Haushalts- & Budgetplaner für 2 Personen • Speicherung lokal im Browser • XML-Datenkompatibel</p>
+    </footer>
+
+    <!-- JS Logic -->
+    <script>
+        // --- DATA STRUCTURE & INITIAL STATE ---
+        const DEFAULT_STATE = {
+            incomes: {
+                person1: 2500,
+                person2: 1900,
+                bonus: 0
+            },
+            splitMode: 'proportional', // 'proportional' or 'equal'
+            categories: [
+                {
+                    id: 'housing',
+                    title: 'Wohnen & Energie',
+                    icon: 'fa-house',
+                    color: '#0d9488', // Teal
+                    shared: true,
+                    items: [
+                        { id: 'h1', name: 'Miete / Hypothek', value: 1100 },
+                        { id: 'h2', name: 'Strom & Gas', value: 180 },
+                        { id: 'h3', name: 'Internet & Festnetz', value: 45 },
+                        { id: 'h4', name: 'GEZ / Rundfunkbeitrag', value: 18.36 },
+                        { id: 'h5', name: 'Müll / Nebenkosten', value: 60 }
+                    ]
+                },
+                {
+                    id: 'daily',
+                    title: 'Alltag & Lebensmittel',
+                    icon: 'fa-basket-shopping',
+                    color: '#10b981', // Emerald
+                    shared: true,
+                    items: [
+                        { id: 'd1', name: 'Supermarkt & Ernährung', value: 500 },
+                        { id: 'd2', name: 'Drogerie & Haushalt', value: 60 },
+                        { id: 'd3', name: 'Mobilität & ÖPNV / Sprit', value: 220 },
+                        { id: 'd4', name: 'Versicherungen (Hausrat/Haftpflicht)', value: 40 }
+                    ]
+                },
+                {
+                    id: 'leisure',
+                    title: 'Freizeit, Luxus & Sparen',
+                    icon: 'fa-champagne-glasses',
+                    color: '#f59e0b', // Amber
+                    shared: false,
+                    items: [
+                        { id: 'l1', name: 'Restaurants & Ausgehen', value: 200 },
+                        { id: 'l2', name: 'Streaming & Abos', value: 35 },
+                        { id: 'l3', name: 'Hobbys & Freizeit', value: 150 },
+                        { id: 'l4', name: 'Urlaubskasse', value: 250 },
+                        { id: 'l5', name: 'Notgroschen / Sparen', value: 300 }
+                    ]
+                }
+            ]
+        };
+
+        let appData = JSON.parse(JSON.stringify(DEFAULT_STATE));
+        let myChart = null;
+
+        // --- LOCAL STORAGE HELPERS ---
+        function saveToLocalStorage() {
+            try {
+                localStorage.setItem('budget_planner_2p_data', JSON.stringify(appData));
+            } catch (e) {
+                console.error("Fehler beim Speichern in LocalStorage", e);
+            }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const stored = localStorage.getItem('budget_planner_2p_data');
+                if (stored) {
+                    appData = JSON.parse(stored);
+                }
+            } catch (e) {
+                console.error("Fehler beim Laden aus LocalStorage", e);
+                appData = JSON.parse(JSON.stringify(DEFAULT_STATE));
+            }
+        }
+
+        function resetToDefaults() {
+            if (confirm("Möchtest du wirklich alle eingegebenen Daten auf die Standardwerte zurücksetzen?")) {
+                appData = JSON.parse(JSON.stringify(DEFAULT_STATE));
+                saveToLocalStorage();
+                initApp();
+                showToast("Daten erfolgreich zurückgesetzt!");
+            }
+        }
+
+        // --- UI RENDER FUNCTIONS ---
+        function initApp() {
+            loadFromLocalStorage();
+
+            // Fill Income Inputs
+            document.getElementById('incomeP1').value = appData.incomes.person1 || '';
+            document.getElementById('incomeP2').value = appData.incomes.person2 || '';
+            document.getElementById('incomeBonus').value = appData.incomes.bonus || '';
+
+            // Set Split Mode Buttons UI
+            setSplitModeUI(appData.splitMode || 'proportional');
+
+            // Render Dynamic Expense Categories
+            renderCategories();
+
+            // Calculate Totals & Update Visuals
+            updateBudget();
+        }
+
+        function renderCategories() {
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+
+            appData.categories.forEach((cat, catIdx) => {
+                const catTotal = cat.items.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
+
+                const catCard = document.createElement('div');
+                catCard.className = "bg-slate-850 p-5 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4";
+
+                let itemsHTML = '';
+                cat.items.forEach((item, itemIdx) => {
+                    itemsHTML += `
+                        <div class="flex items-center gap-2 group">
+                            <input type="text" value="${escapeHtml(item.name)}" 
+                                onchange="updateItemName(${catIdx}, ${itemIdx}, this.value)"
+                                class="bg-transparent text-slate-300 text-xs font-medium focus:bg-slate-900 focus:outline-none focus:px-2 py-1 rounded w-full transition border border-transparent focus:border-slate-700" 
+                                placeholder="Bezeichnung">
+                            
+                            <div class="relative w-28 shrink-0">
+                                <input type="number" value="${item.value !== 0 ? item.value : ''}" min="0" step="5"
+                                    oninput="updateItemValue(${catIdx}, ${itemIdx}, this.value)"
+                                    class="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-right text-xs text-slate-100 font-mono focus:outline-none focus:border-teal-500" 
+                                    placeholder="0">
+                                <span class="absolute right-2 top-1 text-[10px] text-slate-500 pointer-events-none">€</span>
+                            </div>
+
+                            <button onclick="deleteItem(${catIdx}, ${itemIdx})" class="text-slate-600 hover:text-rose-400 p-1 opacity-0 group-hover:opacity-100 transition">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+                });
+
+                catCard.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                            <div class="flex items-center gap-2.5">
+                                <div class="p-2 rounded-xl text-white" style="background-color: ${cat.color}20; color: ${cat.color}">
+                                    <i class="fa-solid ${cat.icon}"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-slate-200">${escapeHtml(cat.title)}</h3>
+                                    <label class="inline-flex items-center mt-0.5 cursor-pointer text-[11px] text-slate-400 hover:text-slate-300">
+                                        <input type="checkbox" ${cat.shared ? 'checked' : ''} onchange="toggleCategoryShared(${catIdx}, this.checked)" class="rounded bg-slate-900 border-slate-700 text-teal-600 focus:ring-0 w-3 h-3 mr-1">
+                                        Für 3-Konten-Modell
+                                    </label>
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold text-slate-200 font-mono">${formatCurrency(catTotal)}</span>
+                        </div>
+
+                        <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                            ${itemsHTML}
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-800/80">
+                        <button onclick="addItem(${catIdx})" class="w-full py-2 border border-dashed border-slate-700 hover:border-teal-500/50 hover:bg-slate-800/50 text-slate-400 hover:text-teal-400 text-xs rounded-xl transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus text-[10px]"></i> Position hinzufügen
+                        </button>
+                    </div>
+                `;
+
+                container.appendChild(catCard);
+            });
+        }
+
+        // --- ITEM MANAGEMENT LOGIC ---
+        function updateItemName(catIdx, itemIdx, val) {
+            appData.categories[catIdx].items[itemIdx].name = val;
+            saveToLocalStorage();
+        }
+
+        function updateItemValue(catIdx, itemIdx, val) {
+            appData.categories[catIdx].items[itemIdx].value = parseFloat(val) || 0;
+            saveToLocalStorage();
+            updateBudget();
+        }
+
+        function addItem(catIdx) {
+            appData.categories[catIdx].items.push({
+                id: 'custom_' + Date.now(),
+                name: 'Neue Position',
+                value: 0
+            });
+            saveToLocalStorage();
+            renderCategories();
+            updateBudget();
+        }
+
+        function deleteItem(catIdx, itemIdx) {
+            appData.categories[catIdx].items.splice(itemIdx, 1);
+            saveToLocalStorage();
+            renderCategories();
+            updateBudget();
+        }
+
+        function toggleCategoryShared(catIdx, isShared) {
+            appData.categories[catIdx].shared = isShared;
+            saveToLocalStorage();
+            updateBudget();
+        }
+
+        // --- CALCULATIONS & UPDATES ---
+        function updateBudget() {
+            // Get Income Values
+            const p1 = parseFloat(document.getElementById('incomeP1').value) || 0;
+            const p2 = parseFloat(document.getElementById('incomeP2').value) || 0;
+            const bonus = parseFloat(document.getElementById('incomeBonus').value) || 0;
+
+            appData.incomes.person1 = p1;
+            appData.incomes.person2 = p2;
+            appData.incomes.bonus = bonus;
+
+            const totalIncome = p1 + p2 + bonus;
+            document.getElementById('incomeTotalLabel').innerText = formatCurrency(totalIncome);
+
+            // Get Expense Totals
+            let totalExpenses = 0;
+            let sharedExpenses = 0;
+
+            appData.categories.forEach(cat => {
+                const catTotal = cat.items.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
+                totalExpenses += catTotal;
+                if (cat.shared) {
+                    sharedExpenses += catTotal;
+                }
+            });
+
+            const surplus = totalIncome - totalExpenses;
+            const savingsRate = totalIncome > 0 ? Math.max(0, (surplus / totalIncome) * 100) : 0;
+            const expensePercent = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
+
+            // Render KPI Header
+            document.getElementById('kpiIncome').innerText = formatCurrency(totalIncome);
+            document.getElementById('kpiExpenses').innerText = formatCurrency(totalExpenses);
+            document.getElementById('kpiExpensesPercent').innerText = `${expensePercent.toFixed(1)}% vom Einkommen`;
+            
+            const surplusEl = document.getElementById('kpiSurplus');
+            surplusEl.innerText = formatCurrency(surplus);
+            if (surplus < 0) {
+                surplusEl.className = "text-2xl font-extrabold text-rose-500 mt-2";
+                document.getElementById('kpiSurplusSub').innerText = "Achtung: Defizit im Monat!";
+            } else {
+                surplusEl.className = "text-2xl font-extrabold text-teal-400 mt-2";
+                document.getElementById('kpiSurplusSub').innerText = "Freies Guthaben nach Ausgaben";
+            }
+
+            document.getElementById('kpiSavingsRate').innerText = `${savingsRate.toFixed(1)} %`;
+            document.getElementById('kpiSavingsBar').style.width = `${Math.min(100, savingsRate)}%`;
+
+            // Update 3-Konten-Modell Calculation
+            calculateThreeAccountModel(p1, p2, sharedExpenses);
+
+            // Refresh Chart Visualization
+            updateChart();
+
+            // Refresh header category totals in UI (subtotals)
+            renderCategoryTotalsOnly();
+
+            saveToLocalStorage();
+        }
+
+        function renderCategoryTotalsOnly() {
+            const container = document.getElementById('categoriesContainer');
+            if (!container || container.children.length !== appData.categories.length) return;
+
+            appData.categories.forEach((cat, catIdx) => {
+                const catTotal = cat.items.reduce((sum, item) => sum + (parseFloat(item.value) || 0), 0);
+                const headerTotalEl = container.children[catIdx]?.querySelector('.font-mono');
+                if (headerTotalEl) {
+                    headerTotalEl.innerText = formatCurrency(catTotal);
+                }
+            });
+        }
+
+        // --- 3-KONTEN-MODELL CALCULATOR ---
+        function setSplitMode(mode) {
+            appData.splitMode = mode;
+            setSplitModeUI(mode);
+            saveToLocalStorage();
+            updateBudget();
+        }
+
+        function setSplitModeUI(mode) {
+            const propBtn = document.getElementById('splitModeProp');
+            const equalBtn = document.getElementById('splitModeEqual');
+
+            if (mode === 'proportional') {
+                propBtn.className = "px-3 py-1.5 rounded-lg font-medium transition bg-teal-600 text-white shadow";
+                equalBtn.className = "px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition";
+            } else {
+                equalBtn.className = "px-3 py-1.5 rounded-lg font-medium transition bg-teal-600 text-white shadow";
+                propBtn.className = "px-3 py-1.5 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition";
+            }
+        }
+
+        function calculateThreeAccountModel(p1, p2, sharedTotal) {
+            document.getElementById('sharedTotal').innerText = formatCurrency(sharedTotal);
+
+            let p1Ratio = 0.5;
+            let p2Ratio = 0.5;
+
+            const personalTotalIncome = p1 + p2;
+
+            if (appData.splitMode === 'proportional' && personalTotalIncome > 0) {
+                p1Ratio = p1 / personalTotalIncome;
+                p2Ratio = p2 / personalTotalIncome;
+            }
+
+            const p1Contrib = sharedTotal * p1Ratio;
+            const p2Contrib = sharedTotal * p2Ratio;
+
+            const p1Rest = p1 - p1Contrib;
+            const p2Rest = p2 - p2Contrib;
+
+            document.getElementById('p1Contribution').innerText = formatCurrency(p1Contrib);
+            document.getElementById('p2Contribution').innerText = formatCurrency(p2Contrib);
+
+            document.getElementById('p1RatioBadge').innerText = `${(p1Ratio * 100).toFixed(1)}%`;
+            document.getElementById('p2RatioBadge').innerText = `${(p2Ratio * 100).toFixed(1)}%`;
+
+            document.getElementById('p1Bar').style.width = `${p1Ratio * 100}%`;
+            document.getElementById('p2Bar').style.width = `${p2Ratio * 100}%`;
+
+            document.getElementById('p1Rest').innerText = formatCurrency(p1Rest);
+            document.getElementById('p2Rest').innerText = formatCurrency(p2Rest);
+        }
+
+        // --- CHART VISUALIZATION ---
+        function updateChart() {
+            const ctx = document.getElementById('budgetChart').getContext('2d');
+
+            const labels = appData.categories.map(c => c.title);
+            const data = appData.categories.map(c => c.items.reduce((s, i) => s + (parseFloat(i.value) || 0), 0));
+            const colors = appData.categories.map(c => c.color);
+
+            // Render Legend text list
+            const legendContainer = document.getElementById('chartLegend');
+            legendContainer.innerHTML = '';
+            
+            const grandTotal = data.reduce((a, b) => a + b, 0);
+
+            appData.categories.forEach((cat, idx) => {
+                const catVal = data[idx];
+                const pct = grandTotal > 0 ? ((catVal / grandTotal) * 100).toFixed(1) : '0.0';
+                
+                legendContainer.innerHTML += `
+                    <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${cat.color}"></span>
+                            <span class="text-slate-300 font-medium">${escapeHtml(cat.title)}</span>
+                        </div>
+                        <div class="text-right font-mono">
+                            <span class="text-slate-200">${formatCurrency(catVal)}</span>
+                            <span class="text-slate-500 text-[10px] ml-1">(${pct}%)</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (myChart) {
+                myChart.data.labels = labels;
+                myChart.data.datasets[0].data = data;
+                myChart.data.datasets[0].backgroundColor = colors;
+                myChart.update();
+            } else {
+                myChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: colors,
+                            borderWidth: 2,
+                            borderColor: '#1e293b'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        cutout: '70%'
+                    }
+                });
+            }
+        }
+
+        // --- XML EXPORT & IMPORT ENGINE ---
+        function exportXML() {
+            let xmlStr = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+            xmlStr += `<budgetPlanner exportDate="${new Date().toISOString()}">\n`;
+
+            // Incomes
+            xmlStr += `  <incomes>\n`;
+            xmlStr += `    <person1>${appData.incomes.person1}</person1>\n`;
+            xmlStr += `    <person2>${appData.incomes.person2}</person2>\n`;
+            xmlStr += `    <bonus>${appData.incomes.bonus}</bonus>\n`;
+            xmlStr += `  </incomes>\n`;
+
+            // Settings
+            xmlStr += `  <settings>\n`;
+            xmlStr += `    <splitMode>${escapeXml(appData.splitMode)}</splitMode>\n`;
+            xmlStr += `  </settings>\n`;
+
+            // Categories & Items
+            xmlStr += `  <categories>\n`;
+            appData.categories.forEach(cat => {
+                xmlStr += `    <category id="${escapeXml(cat.id)}" title="${escapeXml(cat.title)}" shared="${cat.shared}" color="${escapeXml(cat.color)}" icon="${escapeXml(cat.icon)}">\n`;
+                cat.items.forEach(item => {
+                    xmlStr += `      <item id="${escapeXml(item.id)}">\n`;
+                    xmlStr += `        <name>${escapeXml(item.name)}</name>\n`;
+                    xmlStr += `        <value>${item.value}</value>\n`;
+                    xmlStr += `      </item>\n`;
+                });
+                xmlStr += `    </category>\n`;
+            });
+            xmlStr += `  </categories>\n`;
+            xmlStr += `</budgetPlanner>`;
+
+            // Trigger Download
+            const blob = new Blob([xmlStr], { type: 'text/xml;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Budgetplaner_2Personen_${new Date().toISOString().slice(0, 10)}.xml`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showToast("XML-Datei erfolgreich exportiert!");
+        }
+
+        function importXML(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const xmlText = e.target.result;
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+
+                    // Validate XML structure
+                    if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
+                        throw new Error("Ungültiges XML-Format");
+                    }
+
+                    const root = xmlDoc.getElementsByTagName("budgetPlanner")[0];
+                    if (!root) throw new Error("Kein gültiges BudgetPlaner XML-Dokument");
+
+                    // Read Incomes
+                    const p1 = parseFloat(xmlDoc.getElementsByTagName("person1")[0]?.textContent) || 0;
+                    const p2 = parseFloat(xmlDoc.getElementsByTagName("person2")[0]?.textContent) || 0;
+                    const bonus = parseFloat(xmlDoc.getElementsByTagName("bonus")[0]?.textContent) || 0;
+
+                    // Read Split Mode
+                    const splitMode = xmlDoc.getElementsByTagName("splitMode")[0]?.textContent || 'proportional';
+
+                    // Read Categories
+                    const catNodes = xmlDoc.getElementsByTagName("category");
+                    const importedCategories = [];
+
+                    for (let i = 0; i < catNodes.length; i++) {
+                        const catNode = catNodes[i];
+                        const catId = catNode.getAttribute("id") || `cat_${i}`;
+                        const title = catNode.getAttribute("title") || "Kategorie";
+                        const shared = catNode.getAttribute("shared") === "true";
+                        const color = catNode.getAttribute("color") || "#0d9488";
+                        const icon = catNode.getAttribute("icon") || "fa-wallet";
+
+                        const itemNodes = catNode.getElementsByTagName("item");
+                        const items = [];
+
+                        for (let j = 0; j < itemNodes.length; j++) {
+                            const itemNode = itemNodes[j];
+                            const itemId = itemNode.getAttribute("id") || `item_${i}_${j}`;
+                            const name = itemNode.getElementsByTagName("name")[0]?.textContent || "Position";
+                            const value = parseFloat(itemNode.getElementsByTagName("value")[0]?.textContent) || 0;
+
+                            items.push({ id: itemId, name, value });
+                        }
+
+                        importedCategories.push({
+                            id: catId,
+                            title,
+                            shared,
+                            color,
+                            icon,
+                            items
+                        });
+                    }
+
+                    // Assign Parsed Data to State
+                    appData = {
+                        incomes: { person1: p1, person2: p2, bonus: bonus },
+                        splitMode: splitMode,
+                        categories: importedCategories
+                    };
+
+                    saveToLocalStorage();
+                    initApp();
+                    showToast("XML-Daten erfolgreich importiert!");
+
+                } catch (err) {
+                    alert("Fehler beim Importieren der XML-Datei: " + err.message);
+                }
+            };
+
+            reader.readAsText(file);
+            // Reset input value to allow re-uploading the same file
+            event.target.value = '';
+        }
+
+        // --- UTILITY & HELPER FUNCTIONS ---
+        function formatCurrency(val) {
+            return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(val || 0);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function escapeXml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            toastMessage.innerText = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Initialize App on DOM Load
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tom's Start Page</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-color: #f8fafc;
+            --card-hover-color: #f8c838;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: var(--bg-color);
+            font-family: 'Inter', -apple-system, sans-serif;
+            color: var(--text-color);
+        }
+
+        .container {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 1200px;
+            padding: 1rem;
+        }
+
+        .card {
+            width: 160px;
+            height: 160px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-decoration: none;
+            color: inherit;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 1.5rem;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--card-hover-color);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .label {
+            font-weight: 500;
+            letter-spacing: 0.025em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="https://www.youtube.com" class="card">
+            <span class="icon">📺</span>
+            <span class="label">YouTube</span>
+        </a>
+        <a href="https://gemini.google.com" class="card">
+            <span class="icon">✨</span>
+            <span class="label">Gemini</span>
+        </a>
+        <a href="https://www.github.com/tfmerk" class="card">
+            <span class="icon">💻</span>
+            <span class="label">GitHub</span>
+        </a>
+        <a href="https://www.amazon.com" class="card">
+            <span class="icon">📦</span>
+            <span class="label">Amazon</span>
+        </a>
+        <a href="kanban/kanban-board.html" class="card">
+            <span class="icon">📋</span>
+            <span class="label">Kanban</span>
+        </a>
+        <a href="budgetplaner/budgetplaner.html" class="card">
+            <span class="icon">📊</span>
+            <span class="label">Budget Planner</span>
+        </a>
+    </div>
+</body>
+</html>

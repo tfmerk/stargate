@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProKanban Board</title>
+    <!-- SVG Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' fill='%232563eb'><path d='M0 96C0 60.7 28.7 32 64 32H448c35.3 0 64 28.7 64 64V416c0 35.3-28.7 64-64 64H64c-35.3 0-64-28.7-64-64V96zM64 96V416H160V96H64zm128 0V416H320V96H192zm160 0V416H448V96H352z'/></svg>">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.4);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.7);
+        }
+        /* Highlight search match */
+        .search-highlight {
+            background-color: rgba(253, 224, 71, 0.6);
+            color: #000;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+        .dark .search-highlight {
+            background-color: rgba(234, 179, 8, 0.6);
+            color: #fff;
+        }
+        /* Dragging styles */
+        .task-card.dragging {
+            opacity: 0.4;
+            transform: scale(0.98);
+        }
+        .column-body.drag-over {
+            background-color: rgba(59, 130, 246, 0.05);
+            border: 2px dashed #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 h-screen flex flex-col font-sans overflow-hidden transition-colors duration-200">
+
+    <!-- TOP HEADER -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex-none flex flex-wrap items-center justify-between gap-4 shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 text-white p-2 rounded-lg shadow-md flex items-center justify-center w-10 h-10">
+                <i class="fa-solid fa-square-kanban text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">ProKanban</h1>
+                <p class="text-xs text-gray-500 dark:text-gray-400">XML-Synced Task Manager</p>
+            </div>
+        </div>
+
+        <!-- SEARCH & TAG FILTERS -->
+        <div class="flex-1 max-w-md mx-4 flex items-center gap-2">
+            <div class="relative w-full">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                <input type="text" id="searchInput" placeholder="Search title, descriptions, tags..." 
+                       class="w-full pl-9 pr-8 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 dark:text-white">
+                <button id="clearSearchBtn" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- CONTROLS & ACTIONS -->
+        <div class="flex items-center gap-2">
+            <button id="addTaskBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 shadow-sm transition">
+                <i class="fa-solid fa-plus"></i>
+                <span>New Task</span>
+            </button>
+
+            <div class="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1"></div>
+
+            <!-- XML FILE ACTIONS -->
+            <button id="exportXmlBtn" title="Export XML File" class="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 p-2 rounded-lg text-sm transition">
+                <i class="fa-solid fa-file-export"></i>
+            </button>
+            <button id="importXmlBtn" title="Import XML File" class="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 p-2 rounded-lg text-sm transition">
+                <i class="fa-solid fa-file-import"></i>
+            </button>
+            <input type="file" id="xmlFileInput" accept=".xml" class="hidden">
+
+            <div class="h-6 w-px bg-gray-300 dark:bg-gray-700 mx-1"></div>
+
+            <!-- THEME TOGGLE -->
+            <button id="themeToggleBtn" title="Toggle Dark/Light Mode" class="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 p-2 rounded-lg text-sm transition">
+                <i class="fa-solid fa-moon dark:hidden"></i>
+                <i class="fa-solid fa-sun hidden dark:block"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ACTIVE TAG FILTER BAR -->
+    <div id="tagFilterBar" class="hidden bg-gray-200 dark:bg-gray-800 px-6 py-1.5 text-xs flex items-center gap-2 border-b border-gray-300 dark:border-gray-700">
+        <span class="text-gray-500 dark:text-gray-400 font-medium">Filter Tag:</span>
+        <span id="activeTagBadge" class="bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+            <span id="activeTagName">Tag</span>
+            <button id="clearTagFilterBtn" class="hover:text-blue-900 dark:hover:text-white ml-1"><i class="fa-solid fa-xmark"></i></button>
+        </span>
+    </div>
+
+    <!-- MAIN BOARD CONTAINER (Full Height Viewport Lock) -->
+    <main class="flex-1 p-6 overflow-hidden flex gap-6">
+
+        <!-- COLUMN: NEW -->
+        <section class="flex-1 bg-gray-200/70 dark:bg-gray-800/60 rounded-xl flex flex-col max-h-full border border-gray-300/60 dark:border-gray-700/60 shadow-inner" data-stage="New">
+            <header class="p-3.5 flex items-center justify-between border-b border-gray-300/60 dark:border-gray-700/60">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                    <h2 class="font-bold text-gray-700 dark:text-gray-200 text-sm tracking-wide uppercase">New</h2>
+                    <span id="count-New" class="bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+                </div>
+            </header>
+            <div id="column-New" class="column-body p-3 flex-1 overflow-y-auto space-y-3" data-stage="New">
+                <!-- Cards render here -->
+            </div>
+        </section>
+
+        <!-- COLUMN: IN PROGRESS -->
+        <section class="flex-1 bg-gray-200/70 dark:bg-gray-800/60 rounded-xl flex flex-col max-h-full border border-gray-300/60 dark:border-gray-700/60 shadow-inner" data-stage="In Progress">
+            <header class="p-3.5 flex items-center justify-between border-b border-gray-300/60 dark:border-gray-700/60">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                    <h2 class="font-bold text-gray-700 dark:text-gray-200 text-sm tracking-wide uppercase">In Progress</h2>
+                    <span id="count-In Progress" class="bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+                </div>
+                <!-- WIP Limit Controller strictly for In Progress -->
+                <div class="flex items-center gap-1.5">
+                    <span id="wipBadge-InProgress" class="hidden text-xs px-2 py-0.5 rounded font-medium"></span>
+                    <button id="wipConfigBtn" title="Set WIP Limit" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs p-1">
+                        <i class="fa-solid fa-sliders"></i>
+                    </button>
+                </div>
+            </header>
+            <div id="column-InProgress" class="column-body p-3 flex-1 overflow-y-auto space-y-3" data-stage="In Progress">
+                <!-- Cards render here -->
+            </div>
+        </section>
+
+        <!-- COLUMN: DONE -->
+        <section class="flex-1 bg-gray-200/70 dark:bg-gray-800/60 rounded-xl flex flex-col max-h-full border border-gray-300/60 dark:border-gray-700/60 shadow-inner" data-stage="Done">
+            <header class="p-3.5 flex items-center justify-between border-b border-gray-300/60 dark:border-gray-700/60">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                    <h2 class="font-bold text-gray-700 dark:text-gray-200 text-sm tracking-wide uppercase">Done</h2>
+                    <span id="count-Done" class="bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs px-2 py-0.5 rounded-full font-semibold">0</span>
+                </div>
+            </header>
+            <div id="column-Done" class="column-body p-3 flex-1 overflow-y-auto space-y-3" data-stage="Done">
+                <!-- Cards render here -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- TASK EDIT / CREATE MODAL -->
+    <div id="taskModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-200 dark:border-gray-700 transform transition-all">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 id="modalTitle" class="text-lg font-bold text-gray-900 dark:text-white">Create Task</h3>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="taskForm" class="p-6 space-y-4">
+                <input type="hidden" id="taskId">
+                
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Title</label>
+                    <input type="text" id="taskTitleInput" required placeholder="Enter task title..." 
+                           class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Stage</label>
+                        <select id="taskStageInput" class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white">
+                            <option value="New">New</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Done">Done</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Priority</label>
+                        <select id="taskPriorityInput" class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white">
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Urgent">Urgent</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Description</label>
+                    <textarea id="taskDescInput" rows="3" placeholder="Add task description..." 
+                              class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white resize-none"></textarea>
+                </div>
+
+                <!-- TAGS INPUT -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Tags (Comma separated)</label>
+                    <input type="text" id="taskTagsInput" placeholder="e.g. Feature, UI, Bug" 
+                           class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white">
+                </div>
+
+                <!-- SUBTASKS / CHECKLIST -->
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">Subtasks / Checklist</label>
+                    <div id="modalSubtaskList" class="space-y-2 mb-2 max-h-32 overflow-y-auto">
+                        <!-- Dynamic subtask items -->
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="newSubtaskInput" placeholder="Add a checklist item..." 
+                               class="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white">
+                        <button type="button" id="addSubtaskBtn" class="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-3 py-1.5 rounded-lg text-sm font-medium transition">
+                            Add
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button" id="deleteTaskBtn" class="hidden text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium items-center gap-1">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                    <div class="flex gap-2 ml-auto">
+                        <button type="button" id="cancelModalBtn" class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition">Cancel</button>
+                        <button type="submit" class="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition">Save Task</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- WIP LIMIT SETTINGS MODAL (IN PROGRESS ONLY) -->
+    <div id="wipModal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-xs p-6 border border-gray-200 dark:border-gray-700">
+            <h3 class="text-base font-bold text-gray-900 dark:text-white mb-3">In Progress Capacity Limit</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Set maximum allowed WIP tasks (set 0 for no limit):</p>
+            <input type="number" id="wipLimitInput" min="0" max="99" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 mb-4 text-center text-lg font-bold">
+            <div class="flex justify-end gap-2">
+                <button id="cancelWipBtn" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300">Cancel</button>
+                <button id="saveWipBtn" class="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg">Save Limit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APP LOGIC -->
+    <script>
+        // --- CONSTANTS & PRIORITY MAPPING ---
+        const PRIORITIES = {
+            'Urgent': { weight: 4, badge: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-300 dark:border-red-800' },
+            'High':   { weight: 3, badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border-amber-300 dark:border-amber-800' },
+            'Medium': { weight: 2, badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border-blue-300 dark:border-blue-800' },
+            'Low':    { weight: 1, badge: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600' }
+        };
+
+        // --- APPLICATION STATE ---
+        let tasks = [];
+        let inProgressWipLimit = 3;
+        let searchQuery = '';
+        let activeTagFilter = null;
+        let tempModalSubtasks = [];
+
+        // --- DOM ELEMENTS ---
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        const tagFilterBar = document.getElementById('tagFilterBar');
+        const activeTagName = document.getElementById('activeTagName');
+        const clearTagFilterBtn = document.getElementById('clearTagFilterBtn');
+        
+        const taskModal = document.getElementById('taskModal');
+        const taskForm = document.getElementById('taskForm');
+        const modalTitle = document.getElementById('modalTitle');
+        const taskIdInput = document.getElementById('taskId');
+        const taskTitleInput = document.getElementById('taskTitleInput');
+        const taskStageInput = document.getElementById('taskStageInput');
+        const taskPriorityInput = document.getElementById('taskPriorityInput');
+        const taskDescInput = document.getElementById('taskDescInput');
+        const taskTagsInput = document.getElementById('taskTagsInput');
+        const modalSubtaskList = document.getElementById('modalSubtaskList');
+        const newSubtaskInput = document.getElementById('newSubtaskInput');
+        const addSubtaskBtn = document.getElementById('addSubtaskBtn');
+        const deleteTaskBtn = document.getElementById('deleteTaskBtn');
+
+        const wipModal = document.getElementById('wipModal');
+        const wipLimitInput = document.getElementById('wipLimitInput');
+        const wipBadgeInProgress = document.getElementById('wipBadge-InProgress');
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            loadState();
+            renderBoard();
+            setupEventListeners();
+        });
+
+        function initTheme() {
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+
+        function setupEventListeners() {
+            // Theme toggle
+            document.getElementById('themeToggleBtn').addEventListener('click', () => {
+                document.documentElement.classList.toggle('dark');
+                localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+            });
+
+            // Search
+            searchInput.addEventListener('input', (e) => {
+                searchQuery = e.target.value.trim().toLowerCase();
+                clearSearchBtn.classList.toggle('hidden', searchQuery === '');
+                renderBoard();
+            });
+            clearSearchBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                searchQuery = '';
+                clearSearchBtn.classList.add('hidden');
+                renderBoard();
+            });
+
+            // Clear Tag Filter
+            clearTagFilterBtn.addEventListener('click', () => {
+                activeTagFilter = null;
+                tagFilterBar.classList.add('hidden');
+                renderBoard();
+            });
+
+            // Open Create Task Modal
+            document.getElementById('addTaskBtn').addEventListener('click', () => openTaskModal());
+            document.getElementById('closeModalBtn').addEventListener('click', closeTaskModal);
+            document.getElementById('cancelModalBtn').addEventListener('click', closeTaskModal);
+
+            // Subtask addition in modal
+            addSubtaskBtn.addEventListener('click', addSubtaskFromInput);
+            newSubtaskInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addSubtaskFromInput();
+                }
+            });
+
+            // Form Submit & Delete
+            taskForm.addEventListener('submit', handleTaskFormSubmit);
+            deleteTaskBtn.addEventListener('click', handleDeleteTask);
+
+            // WIP Limit Config Modal
+            document.getElementById('wipConfigBtn').addEventListener('click', () => {
+                wipLimitInput.value = inProgressWipLimit;
+                wipModal.classList.remove('hidden');
+            });
+            document.getElementById('cancelWipBtn').addEventListener('click', () => wipModal.classList.add('hidden'));
+            document.getElementById('saveWipBtn').addEventListener('click', () => {
+                inProgressWipLimit = parseInt(wipLimitInput.value, 10) || 0;
+                wipModal.classList.add('hidden');
+                saveState();
+                renderBoard();
+            });
+
+            // XML Export & Import
+            document.getElementById('exportXmlBtn').addEventListener('click', exportToXml);
+            document.getElementById('importXmlBtn').addEventListener('click', () => document.getElementById('xmlFileInput').click());
+            document.getElementById('xmlFileInput').addEventListener('change', importFromXml);
+
+            // Drag & Drop event listeners on columns
+            document.querySelectorAll('.column-body').forEach(col => {
+                col.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    col.classList.add('drag-over');
+                });
+                col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+                col.addEventListener('drop', e => {
+                    e.preventDefault();
+                    col.classList.remove('drag-over');
+                    const taskId = e.dataTransfer.getData('text/plain');
+                    const targetStage = col.dataset.stage;
+                    moveTaskStage(taskId, targetStage);
+                });
+            });
+        }
+
+        // --- BOARD RENDER ENGINE ---
+        function renderBoard() {
+            // Priority Auto-Sorting
+            tasks.sort((a, b) => PRIORITIES[b.priority].weight - PRIORITIES[a.priority].weight);
+
+            const columns = {
+                'New': document.getElementById('column-New'),
+                'In Progress': document.getElementById('column-InProgress'),
+                'Done': document.getElementById('column-Done')
+            };
+
+            Object.values(columns).forEach(col => col.innerHTML = '');
+
+            const counts = { 'New': 0, 'In Progress': 0, 'Done': 0 };
+
+            tasks.forEach(task => {
+                // Apply Search & Tag filters
+                const matchesSearch = !searchQuery || 
+                    task.title.toLowerCase().includes(searchQuery) || 
+                    task.description.toLowerCase().includes(searchQuery) ||
+                    task.tags.some(t => t.toLowerCase().includes(searchQuery));
+                
+                const matchesTag = !activeTagFilter || task.tags.includes(activeTagFilter);
+
+                if (matchesSearch && matchesTag) {
+                    if (columns[task.stage]) {
+                        columns[task.stage].appendChild(createTaskCard(task));
+                    }
+                }
+
+                if (counts.hasOwnProperty(task.stage)) {
+                    counts[task.stage]++;
+                }
+            });
+
+            // Update Counts
+            document.getElementById('count-New').textContent = counts['New'];
+            document.getElementById('count-In Progress').textContent = counts['In Progress'];
+            document.getElementById('count-Done').textContent = counts['Done'];
+
+            // Update WIP Limit visual indicator specifically for In Progress
+            if (inProgressWipLimit > 0) {
+                wipBadgeInProgress.classList.remove('hidden');
+                wipBadgeInProgress.textContent = `${counts['In Progress']}/${inProgressWipLimit} WIP`;
+                if (counts['In Progress'] > inProgressWipLimit) {
+                    wipBadgeInProgress.className = "text-xs px-2 py-0.5 rounded font-bold bg-red-500 text-white animate-pulse";
+                } else {
+                    wipBadgeInProgress.className = "text-xs px-2 py-0.5 rounded font-medium bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300";
+                }
+            } else {
+                wipBadgeInProgress.classList.add('hidden');
+            }
+        }
+
+        // --- TASK CARD CREATION ---
+        function createTaskCard(task) {
+            const card = document.createElement('article');
+            card.className = "task-card bg-white dark:bg-gray-700/90 p-3.5 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm hover:shadow-md transition cursor-grab active:cursor-grabbing space-y-2.5 relative group";
+            card.draggable = true;
+            card.dataset.id = task.id;
+
+            // DRAG EVENTS
+            card.addEventListener('dragstart', (e) => {
+                card.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', task.id);
+            });
+            card.addEventListener('dragend', () => card.classList.remove('dragging'));
+
+            // DOUBLE CLICK TO EDIT
+            card.addEventListener('dblclick', () => openTaskModal(task.id));
+
+            // Header: Priority Dropdown + Stage Fast Shift Buttons
+            const cardHeader = document.createElement('div');
+            cardHeader.className = "flex items-center justify-between gap-2";
+
+            // Interactive Priority Select Dropdown
+            const prioritySelect = document.createElement('select');
+            prioritySelect.className = `text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${PRIORITIES[task.priority].badge} cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500`;
+            
+            Object.keys(PRIORITIES).forEach(pKey => {
+                const opt = document.createElement('option');
+                opt.value = pKey;
+                opt.textContent = pKey;
+                opt.selected = (pKey === task.priority);
+                prioritySelect.appendChild(opt);
+            });
+
+            prioritySelect.addEventListener('click', (e) => e.stopPropagation());
+            prioritySelect.addEventListener('dblclick', (e) => e.stopPropagation());
+            prioritySelect.addEventListener('change', (e) => {
+                e.stopPropagation();
+                task.priority = e.target.value;
+                saveState();
+                renderBoard();
+            });
+
+            const stageShift = document.createElement('div');
+            stageShift.className = "flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity";
+            if (task.stage !== 'New') {
+                stageShift.appendChild(createShiftBtn('<i class="fa-solid fa-arrow-left"></i>', () => shiftStage(task.id, -1)));
+            }
+            if (task.stage !== 'Done') {
+                stageShift.appendChild(createShiftBtn('<i class="fa-solid fa-arrow-right"></i>', () => shiftStage(task.id, 1)));
+            }
+
+            cardHeader.appendChild(prioritySelect);
+            cardHeader.appendChild(stageShift);
+
+            // Title
+            const titleEl = document.createElement('h3');
+            titleEl.className = "font-semibold text-sm text-gray-900 dark:text-white leading-snug";
+            titleEl.innerHTML = highlightText(task.title, searchQuery);
+
+            // Description
+            let descEl = null;
+            if (task.description) {
+                descEl = document.createElement('p');
+                descEl.className = "text-xs text-gray-500 dark:text-gray-300 line-clamp-2 leading-relaxed";
+                descEl.innerHTML = highlightText(task.description, searchQuery);
+            }
+
+            // Subtasks interactive checklist summary
+            let subtasksEl = null;
+            if (task.subtasks && task.subtasks.length > 0) {
+                const completedCount = task.subtasks.filter(s => s.completed).length;
+                const percent = Math.round((completedCount / task.subtasks.length) * 100);
+
+                subtasksEl = document.createElement('div');
+                subtasksEl.className = "space-y-1.5 pt-1 border-t border-gray-100 dark:border-gray-600/50";
+                
+                const subHeader = document.createElement('div');
+                subHeader.className = "flex justify-between items-center text-[11px] text-gray-500 dark:text-gray-400";
+                subHeader.innerHTML = `<span><i class="fa-regular fa-square-check mr-1"></i> ${completedCount}/${task.subtasks.length} Subtasks</span><span class="font-medium">${percent}%</span>`;
+                
+                const progressBar = document.createElement('div');
+                progressBar.className = "w-full bg-gray-200 dark:bg-gray-600 h-1 rounded-full overflow-hidden mb-1.5";
+                progressBar.innerHTML = `<div class="bg-blue-500 h-full transition-all duration-300" style="width: ${percent}%"></div>`;
+
+                const subItemsList = document.createElement('div');
+                subItemsList.className = "space-y-1 max-h-24 overflow-y-auto";
+
+                task.subtasks.forEach((sub, sIdx) => {
+                    const subLabel = document.createElement('label');
+                    subLabel.className = "flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600/50 p-0.5 rounded";
+                    
+                    const subCheckbox = document.createElement('input');
+                    subCheckbox.type = "checkbox";
+                    subCheckbox.checked = sub.completed;
+                    subCheckbox.className = "rounded text-blue-600 focus:ring-blue-500 text-xs";
+                    
+                    // Isolate click events to prevent opening the task modal
+                    subCheckbox.addEventListener('click', (e) => e.stopPropagation());
+                    subCheckbox.addEventListener('dblclick', (e) => e.stopPropagation());
+                    subCheckbox.addEventListener('change', (e) => {
+                        e.stopPropagation();
+                        task.subtasks[sIdx].completed = subCheckbox.checked;
+                        saveState();
+                        renderBoard();
+                    });
+
+                    const subText = document.createElement('span');
+                    subText.className = sub.completed ? "line-through text-gray-400 dark:text-gray-500" : "";
+                    subText.textContent = sub.title;
+
+                    subLabel.appendChild(subCheckbox);
+                    subLabel.appendChild(subText);
+                    subLabel.addEventListener('dblclick', (e) => e.stopPropagation());
+                    subItemsList.appendChild(subLabel);
+                });
+
+                subtasksEl.appendChild(subHeader);
+                subtasksEl.appendChild(progressBar);
+                subtasksEl.appendChild(subItemsList);
+            }
+
+            // Tags
+            let tagsEl = null;
+            if (task.tags && task.tags.length > 0) {
+                tagsEl = document.createElement('div');
+                tagsEl.className = "flex flex-wrap gap-1 pt-1";
+                task.tags.forEach(tag => {
+                    const tagBadge = document.createElement('button');
+                    tagBadge.className = "text-[10px] bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-200 px-1.5 py-0.5 rounded hover:bg-blue-100 hover:text-blue-700 dark:hover:bg-blue-900 transition";
+                    tagBadge.innerHTML = highlightText(tag, searchQuery);
+                    tagBadge.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        activeTagFilter = tag;
+                        activeTagName.textContent = tag;
+                        tagFilterBar.classList.remove('hidden');
+                        renderBoard();
+                    });
+                    tagBadge.addEventListener('dblclick', (e) => e.stopPropagation());
+                    tagsEl.appendChild(tagBadge);
+                });
+            }
+
+            // Assemble Card
+            card.appendChild(cardHeader);
+            card.appendChild(titleEl);
+            if (descEl) card.appendChild(descEl);
+            if (subtasksEl) card.appendChild(subtasksEl);
+            if (tagsEl) card.appendChild(tagsEl);
+
+            return card;
+        }
+
+        function createShiftBtn(iconHtml, onClick) {
+            const btn = document.createElement('button');
+            btn.className = "p-1 text-xs text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition";
+            btn.innerHTML = iconHtml;
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                onClick();
+            });
+            btn.addEventListener('dblclick', (e) => e.stopPropagation());
+            return btn;
+        }
+
+        // --- SEARCH HIGHLIGHTER HELPER ---
+        function highlightText(text, query) {
+            if (!query) return escapeHtml(text);
+            const escapedText = escapeHtml(text);
+            const regex = new RegExp(`(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
+            return escapedText.replace(regex, '<mark class="search-highlight">$1</mark>');
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        // --- QUICK ACTIONS ---
+        function shiftStage(taskId, direction) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+            const stages = ['New', 'In Progress', 'Done'];
+            const currentIndex = stages.indexOf(task.stage);
+            const targetIndex = currentIndex + direction;
+            if (targetIndex >= 0 && targetIndex < stages.length) {
+                task.stage = stages[targetIndex];
+                saveState();
+                renderBoard();
+            }
+        }
+
+        function moveTaskStage(taskId, targetStage) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task && task.stage !== targetStage) {
+                task.stage = targetStage;
+                saveState();
+                renderBoard();
+            }
+        }
+
+        // --- MODAL & CRUD LOGIC ---
+        function openTaskModal(taskId = null) {
+            if (taskId) {
+                const task = tasks.find(t => t.id === taskId);
+                if (!task) return;
+                modalTitle.textContent = "Edit Task";
+                taskIdInput.value = task.id;
+                taskTitleInput.value = task.title;
+                taskStageInput.value = task.stage;
+                taskPriorityInput.value = task.priority;
+                taskDescInput.value = task.description || '';
+                taskTagsInput.value = task.tags ? task.tags.join(', ') : '';
+                tempModalSubtasks = JSON.parse(JSON.stringify(task.subtasks || []));
+                deleteTaskBtn.classList.remove('hidden');
+                deleteTaskBtn.classList.add('flex');
+            } else {
+                modalTitle.textContent = "Create Task";
+                taskForm.reset();
+                taskIdInput.value = '';
+                tempModalSubtasks = [];
+                deleteTaskBtn.classList.add('hidden');
+                deleteTaskBtn.classList.remove('flex');
+            }
+            renderModalSubtasks();
+            taskModal.classList.remove('hidden');
+        }
+
+        function closeTaskModal() {
+            taskModal.classList.add('hidden');
+        }
+
+        function renderModalSubtasks() {
+            modalSubtaskList.innerHTML = '';
+            tempModalSubtasks.forEach((sub, index) => {
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-700/50 p-2 rounded border border-gray-200 dark:border-gray-600 text-xs";
+                
+                const checkLabel = document.createElement('label');
+                checkLabel.className = "flex items-center gap-2 cursor-pointer flex-1";
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = "checkbox";
+                checkbox.checked = sub.completed;
+                checkbox.className = "rounded text-blue-600 focus:ring-blue-500";
+                checkbox.addEventListener('change', () => {
+                    tempModalSubtasks[index].completed = checkbox.checked;
+                });
+
+                const textSpan = document.createElement('span');
+                textSpan.className = sub.completed ? "line-through text-gray-400 dark:text-gray-500" : "text-gray-700 dark:text-gray-200";
+                textSpan.textContent = sub.title;
+
+                checkLabel.appendChild(checkbox);
+                checkLabel.appendChild(textSpan);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = "button";
+                removeBtn.className = "text-gray-400 hover:text-red-500";
+                removeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                removeBtn.addEventListener('click', () => {
+                    tempModalSubtasks.splice(index, 1);
+                    renderModalSubtasks();
+                });
+
+                item.appendChild(checkLabel);
+                item.appendChild(removeBtn);
+                modalSubtaskList.appendChild(item);
+            });
+        }
+
+        function addSubtaskFromInput() {
+            const val = newSubtaskInput.value.trim();
+            if (val) {
+                tempModalSubtasks.push({ title: val, completed: false });
+                newSubtaskInput.value = '';
+                renderModalSubtasks();
+            }
+        }
+
+        function handleTaskFormSubmit(e) {
+            e.preventDefault();
+            const id = taskIdInput.value;
+            const title = taskTitleInput.value.trim();
+            const stage = taskStageInput.value;
+            const priority = taskPriorityInput.value;
+            const description = taskDescInput.value.trim();
+            const tags = taskTagsInput.value.split(',').map(t => t.trim()).filter(t => t.length > 0);
+
+            if (id) {
+                // Update
+                const task = tasks.find(t => t.id === id);
+                if (task) {
+                    task.title = title;
+                    task.stage = stage;
+                    task.priority = priority;
+                    task.description = description;
+                    task.tags = tags;
+                    task.subtasks = tempModalSubtasks;
+                }
+            } else {
+                // Create
+                const newTask = {
+                    id: 'task_' + Date.now(),
+                    title,
+                    stage,
+                    priority,
+                    description,
+                    tags,
+                    subtasks: tempModalSubtasks
+                };
+                tasks.push(newTask);
+            }
+
+            saveState();
+            renderBoard();
+            closeTaskModal();
+        }
+
+        function handleDeleteTask() {
+            const id = taskIdInput.value;
+            if (id && confirm('Are you sure you want to delete this task?')) {
+                tasks = tasks.filter(t => t.id !== id);
+                saveState();
+                renderBoard();
+                closeTaskModal();
+            }
+        }
+
+        // --- LOCAL STORAGE PERSISTENCE ---
+        function saveState() {
+            localStorage.setItem('kanban_tasks', JSON.stringify(tasks));
+            localStorage.setItem('kanban_wip_inprogress', inProgressWipLimit.toString());
+        }
+
+        function loadState() {
+            const savedTasks = localStorage.getItem('kanban_tasks');
+            const savedWip = localStorage.getItem('kanban_wip_inprogress');
+
+            if (savedWip !== null) {
+                inProgressWipLimit = parseInt(savedWip, 10) || 0;
+            }
+
+            if (savedTasks) {
+                try {
+                    tasks = JSON.parse(savedTasks);
+                } catch (e) {
+                    console.error("Failed to parse local tasks:", e);
+                    loadDefaultTasks();
+                }
+            } else {
+                loadDefaultTasks();
+            }
+        }
+
+        function loadDefaultTasks() {
+            tasks = [
+                {
+                    id: 'default_1',
+                    title: 'Design UI Wireframes',
+                    stage: 'New',
+                    priority: 'High',
+                    description: 'Draft initial dark/light mode wireframes for dashboard.',
+                    tags: ['UI/UX', 'Design'],
+                    subtasks: [
+                        { title: 'Mobile View', completed: true },
+                        { title: 'Desktop View', completed: false }
+                    ]
+                },
+                {
+                    id: 'default_2',
+                    title: 'Implement XML Import/Export',
+                    stage: 'In Progress',
+                    priority: 'Urgent',
+                    description: 'Ensure full DOMParser and XMLSerializer sync with LocalStorage.',
+                    tags: ['Core', 'Feature'],
+                    subtasks: [
+                        { title: 'Export Handler', completed: true },
+                        { title: 'Import Handler', completed: true }
+                    ]
+                },
+                {
+                    id: 'default_3',
+                    title: 'Setup Project Repository',
+                    stage: 'Done',
+                    priority: 'Low',
+                    description: 'Initialize Git repo and configure build environment.',
+                    tags: ['DevOps'],
+                    subtasks: []
+                }
+            ];
+            saveState();
+        }
+
+        // --- XML SYNC SYSTEM (DOMParser & XMLSerializer) ---
+        function exportToXml() {
+            const xmlDoc = document.implementation.createDocument(null, "kanbanBoard", null);
+            const root = xmlDoc.documentElement;
+
+            // Metadata & WIP limit
+            const wipNode = xmlDoc.createElement("inProgressWipLimit");
+            wipNode.textContent = inProgressWipLimit;
+            root.appendChild(wipNode);
+
+            const tasksNode = xmlDoc.createElement("tasks");
+
+            tasks.forEach(task => {
+                const taskNode = xmlDoc.createElement("task");
+                
+                const idNode = xmlDoc.createElement("id");
+                idNode.textContent = task.id;
+                taskNode.appendChild(idNode);
+
+                const titleNode = xmlDoc.createElement("title");
+                titleNode.textContent = task.title;
+                taskNode.appendChild(titleNode);
+
+                const stageNode = xmlDoc.createElement("stage");
+                stageNode.textContent = task.stage;
+                taskNode.appendChild(stageNode);
+
+                const priorityNode = xmlDoc.createElement("priority");
+                priorityNode.textContent = task.priority;
+                taskNode.appendChild(priorityNode);
+
+                const descNode = xmlDoc.createElement("description");
+                descNode.textContent = task.description || '';
+                taskNode.appendChild(descNode);
+
+                // Tags
+                const tagsNode = xmlDoc.createElement("tags");
+                (task.tags || []).forEach(tag => {
+                    const tagNode = xmlDoc.createElement("tag");
+                    tagNode.textContent = tag;
+                    tagsNode.appendChild(tagNode);
+                });
+                taskNode.appendChild(tagsNode);
+
+                // Subtasks
+                const subtasksNode = xmlDoc.createElement("subtasks");
+                (task.subtasks || []).forEach(sub => {
+                    const subNode = xmlDoc.createElement("subtask");
+                    subNode.setAttribute("completed", sub.completed ? "true" : "false");
+                    subNode.textContent = sub.title;
+                    subtasksNode.appendChild(subNode);
+                });
+                taskNode.appendChild(subtasksNode);
+
+                tasksNode.appendChild(taskNode);
+            });
+
+            root.appendChild(tasksNode);
+
+            // Serialize & Download
+            const serializer = new XMLSerializer();
+            const xmlString = '<?xml version="1.0" encoding="UTF-8"?>\n' + serializer.serializeToString(xmlDoc);
+            
+            const blob = new Blob([xmlString], { type: 'application/xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `kanban_export_${new Date().toISOString().slice(0,10)}.xml`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function importFromXml(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
+
+                    // Parse error check
+                    const parserError = xmlDoc.querySelector("parsererror");
+                    if (parserError) {
+                        alert("Error parsing XML file. Please check file format.");
+                        return;
+                    }
+
+                    // WIP Limit for In Progress
+                    const wipNode = xmlDoc.querySelector("inProgressWipLimit");
+                    if (wipNode) {
+                        inProgressWipLimit = parseInt(wipNode.textContent, 10) || 0;
+                    }
+
+                    // Parse Tasks
+                    const taskNodes = xmlDoc.querySelectorAll("task");
+                    const importedTasks = [];
+
+                    taskNodes.forEach(tNode => {
+                        const getVal = (tag) => tNode.querySelector(tag)?.textContent || '';
+                        
+                        // Parse Tags
+                        const tagNodes = tNode.querySelectorAll("tags > tag");
+                        const tags = Array.from(tagNodes).map(tn => tn.textContent.trim());
+
+                        // Parse Subtasks
+                        const subNodes = tNode.querySelectorAll("subtasks > subtask");
+                        const subtasks = Array.from(subNodes).map(sn => ({
+                            title: sn.textContent.trim(),
+                            completed: sn.getAttribute("completed") === "true"
+                        }));
+
+                        importedTasks.push({
+                            id: getVal("id") || ('task_' + Date.now() + Math.random()),
+                            title: getVal("title") || 'Untitled Task',
+                            stage: getVal("stage") || 'New',
+                            priority: getVal("priority") || 'Medium',
+                            description: getVal("description"),
+                            tags,
+                            subtasks
+                        });
+                    });
+
+                    tasks = importedTasks;
+                    saveState();
+                    renderBoard();
+                    alert(`Successfully imported ${tasks.length} tasks from XML!`);
+
+                } catch (err) {
+                    console.error("XML Import Error:", err);
+                    alert("Failed to import XML file.");
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+    </script>
+</body>
+</html>
